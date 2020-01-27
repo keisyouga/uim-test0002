@@ -1,0 +1,74 @@
+* what is this?
+
+this is my study of uim module.
+
+* goal
+
+- like generic.scm, used by other modules.
+- use table file.
+- switch and state-on im.
+
+* how to use?
+
+- build test0002.so from test0002.c
+
+- copy
+  test0002.scm
+  test0002.so
+  nihongoload.scm
+  hiragana.txt
+  katakana.txt
+to
+  ~/.uim.d/plugin/
+
+- run
+#+BEGIN_SRC
+$ uim-module-manager --register nihongoload --path ~/.uim.d/plugin
+#+END_SRC
+
+- edit ~/.uim
+to switch hiragana and katakana with key <alt-1> and <alt-2>
+
+#+BEGIN_SRC scheme
+(define key-press-handler
+  (lambda (uc key state)
+    (let* ((c (im-retrieve-context uc))
+           (im (and c (context-im c))))
+      (context-set-key-passthrough! c #f)
+      (cond
+       ((and enable-im-toggle?
+             (toggle-im-key? key state))
+        (toggle-im uc c))
+       ((and enable-im-switch?
+             (switch-im-key? key state))
+        (switch-im uc (im-name im)))
+       ;; im switch hack
+       ((and (equal? "nihongoload" (im-module-name (context-im c)))
+             (symbol-bound? 'test0002-context-on)
+             (test0002-context-on c))
+        (cond
+         ((switch-to-im1-key? key state)
+          (im-switch-im uc switch-im1)
+          (test0002-context-set-on! c #t)
+          )
+         ((switch-to-im2-key? key state)
+          (im-switch-im uc switch-im2)
+          (test0002-context-set-on! c #t)
+          )
+         (else
+          (invoke-handler im-key-press-handler uc key state))
+         ))
+       ((modifier-key? key state)
+        ;; don't discard modifier press/release edge for apps
+        (im-commit-raw c))
+       (else
+        (invoke-handler im-key-press-handler uc key state)))
+      (not (context-key-passthrough c)))))
+
+(define switch-to-im1-key '("<Alt>1"))
+(define switch-to-im1-key? (make-key-predicate switch-to-im1-key))
+(define switch-im1 'hiragana)
+(define switch-to-im2-key '("<Alt>2"))
+(define switch-to-im2-key? (make-key-predicate switch-to-im2-key))
+(define switch-im2 'katakana)
+#+END_SRC
